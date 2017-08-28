@@ -1,0 +1,8 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP CD74AC164
+D 8 bits serial in shift register
+K SR
+$ENDCMP
+#
+#End Doc Library
