@@ -1,6 +1,6 @@
 #include <avr/io.h>
 #include <util/delay.h>
-#include "pin.h"
+#include "../common/pin.h"
 
 /* A shift register connected to a 7-segments led matrix
  *
