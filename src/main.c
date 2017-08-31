@@ -28,8 +28,10 @@
  * The program will count from 0 to 9!
  */
 
-#define CP PinB1
-#define DS PinB2
+// CP outputs to our 3 shift registers go through a 2-4 decoder.
+#define CP1 PinB1
+#define CP2 PinB2
+#define DS PinB4
 
 // Least significant bit is on Q0
 //               XABCDEGF
@@ -44,11 +46,34 @@
 #define Seg7_8 0b01111111
 #define Seg7_9 0b01111011
 
-void togglecp()
+typedef enum {
+    SR1_CP,
+    SR2_CP,
+    SR3_CP
+} SR_CP_PIN;
+
+/* our decoder keep output pins high except for the selected one. To toggle our selected CP, our
+ * strategy is to generally keep all CP pins high by selecting output Y3 of the decoder. Then, we
+ * select the proper output to go low, wait for a shift register cycle, the select Y3 again.
+ */
+void togglecp(SR_CP_PIN pin)
 {
-    pinlow(CP);
+    switch (pin) {
+        case SR1_CP:
+            pinlow(CP1);
+            pinlow(CP2);
+            break;
+        case SR2_CP:
+            pinlow(CP2);
+            break;
+        case SR3_CP:
+            pinlow(CP1);
+            break;
+    }
     _delay_us(100);
-    pinhigh(CP);
+    // select y3 (all high)
+    pinhigh(CP1);
+    pinhigh(CP2);
 }
 
 // LSB goes on q0
@@ -58,7 +83,7 @@ void shiftsend(unsigned char val)
 
     for (i=7; i>=0; i--) {
         pinset(DS, val & (1 << i));
-        togglecp();
+        togglecp(SR1_CP);
     }
 }
 
@@ -67,8 +92,13 @@ int main (void)
     unsigned char digits[10] = {Seg7_0, Seg7_1, Seg7_2, Seg7_3, Seg7_4, Seg7_5, Seg7_6, Seg7_7, Seg7_8, Seg7_9};
     unsigned char i;
 
-    pinoutputmode(CP);
+    pinoutputmode(CP1);
+    pinoutputmode(CP2);
     pinoutputmode(DS);
+
+    // All CP pins high. See togglecp()
+    pinhigh(CP1);
+    pinhigh(CP2);
 
     for (i=0; i<10; i++)
     {
