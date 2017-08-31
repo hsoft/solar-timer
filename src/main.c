@@ -56,7 +56,7 @@ typedef enum {
  * strategy is to generally keep all CP pins high by selecting output Y3 of the decoder. Then, we
  * select the proper output to go low, wait for a shift register cycle, the select Y3 again.
  */
-void togglecp(SR_CP_PIN pin)
+static void togglecp(SR_CP_PIN pin)
 {
     switch (pin) {
         case SR1_CP:
@@ -77,13 +77,13 @@ void togglecp(SR_CP_PIN pin)
 }
 
 // LSB goes on q0
-void shiftsend(unsigned char val)
+static void shiftsend(SR_CP_PIN pin, unsigned char val)
 {
     char i;
 
     for (i=7; i>=0; i--) {
         pinset(DS, val & (1 << i));
-        togglecp(SR1_CP);
+        togglecp(pin);
     }
 }
 
@@ -104,7 +104,8 @@ int main (void)
     {
         // We use bitwise NOT because our 7seg is a Common Anode, which means that *low* pins are
         // enabled.
-        shiftsend(~digits[i]);
+        shiftsend(SR1_CP, ~digits[i]);
+        shiftsend(SR2_CP, ~digits[i]);
         _delay_ms(1000);
     }
 }
