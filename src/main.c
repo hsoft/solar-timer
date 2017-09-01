@@ -1,6 +1,7 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include "../common/pin.h"
+#include "../common/util.h"
 
 /* 3 7-segments displays managed with shift registers
  *
@@ -24,6 +25,8 @@
  * For SR3, it's OE we connect to ground, SER we connect to PB4. Then, we connect both SRCLK and
  * RCLK to Y2 on the decoder.
  *
+ * Decoder's inputs are PB0 and PB1.
+ *
  * Connect the matrix' common anode to power through a 110 ohms resistance.
  *
  * The LED matrix is connected to the shift register's output as follow:
@@ -37,12 +40,18 @@
  * A = Q6
  * DP = Q7
  *
- * The program will count from 0 to 1024! We indicate digits overflow with a dot on the 3rd digit.
+ * After that comes the phototransistor which is connected on ADC1 (PB3) with a 10K pull down
+ * resistor.
+ *
+ * The program will show the last read value from ADC1 and refresh that value every second.
+ *
+ * Possible values range from 0 to 1023. If the value is higher than 999, the last 3 digit are
+ * shown and the leftmost digit will have its dot shown.
  */
 
 // CP outputs to our 3 shift registers go through a 2-4 decoder.
 #define CP1 PinB1
-#define CP2 PinB2
+#define CP2 PinB0
 #define DS PinB4
 
 // Least significant bit is on Q0
@@ -129,10 +138,19 @@ static void senddigits(unsigned int val)
     }
 }
 
-int main (void)
+static unsigned int adc0val()
 {
-    unsigned int i;
+    unsigned char high, low;
 
+    sbi(ADCSRA, ADSC);
+    while (bit_is_set(ADCSRA, ADSC));
+    low = ADCL;
+    high = ADCH;
+    return (high << 8) | low;
+}
+
+static void setup()
+{
     pinoutputmode(CP1);
     pinoutputmode(CP2);
     pinoutputmode(DS);
@@ -141,9 +159,17 @@ int main (void)
     pinhigh(CP1);
     pinhigh(CP2);
 
-    for (i=0; i<1024; i++)
-    {
-        senddigits(i);
-        _delay_ms(200);
+    ADMUX = (1 << MUX0); // ADC1
+    ADCSRA |= (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
+    sbi(ADCSRA, ADEN);
+}
+
+int main(void)
+{
+    setup();
+
+    while (1) {
+        senddigits(adc0val());
+        _delay_ms(1000);
     }
 }
