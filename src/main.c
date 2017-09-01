@@ -2,30 +2,42 @@
 #include <util/delay.h>
 #include "../common/pin.h"
 
-/* A shift register connected to a 7-segments led matrix
+/* 3 7-segments displays managed with shift registers
  *
- * This allows us to demonstrate how to use a 7-segments matrix by using only 2 pins of
- * our MCU!
+ * The goal is to control 3 7-segments displays using only 3 pins on the MCU. We do this
+ * through 3 shift registers. Between these SRs and the MCU comes a 2-to-4 decoder, allowing
+ * us to use one less pin.
  *
- * - a 8bit shift register. I use a TI CD74AC164E
- * - a 7-segment led matrix. I use a Lite-On LSHD-A101
+ * How it works is that serial input for all SRs are always the same (PB4 on the MCU), it's
+ * SRs *clock* that is activated one at a time, through the decoder.
  *
- * Connect MR and DS2 to power so they're always high. CP to PB1, DS1 to PB2.
+ * Parts:
+ *
+ * - 2x TI CD74AC164E (8bit shift register)
+ * - 1x TI SN74HC595N (I know, it needlessly complicated things, but I only had two CD74AC164E in stock :( )
+ * - 1x TI SN74AHC139 (2-to-4 decoder)
+ * - a 7-segment led matrix with a dot pin. I use a Lite-On LSHD-A101
+ *
+ * For SR1 and SR2, connect MR and DS2 to power so they're always high. CP to outpus Y0 and Y1 of
+ * the decoder.
+ *
+ * For SR3, it's OE we connect to ground, SER we connect to PB4. Then, we connect both SRCLK and
+ * RCLK to Y2 on the decoder.
  *
  * Connect the matrix' common anode to power through a 110 ohms resistance.
  *
  * The LED matrix is connected to the shift register's output as follow:
  *
- * F = Q0
+ * F = Q0 (QA on SR3)
  * G = Q1
  * E = Q2
  * D = Q3
  * C = Q4
  * B = Q5
  * A = Q6
- * We leave DP alone, Q7 is not connected.
+ * DP = Q7
  *
- * The program will count from 0 to 9!
+ * The program will count from 0 to 1024! We indicate digits overflow with a dot on the 3rd digit.
  */
 
 // CP outputs to our 3 shift registers go through a 2-4 decoder.
@@ -45,6 +57,8 @@
 #define Seg7_7 0b01110000
 #define Seg7_8 0b01111111
 #define Seg7_9 0b01111011
+#define Seg7_Dash 0b00000010
+#define Seg7_Dot 0b10000000
 
 typedef enum {
     SR1_CP,
@@ -85,12 +99,39 @@ static void shiftsend(SR_CP_PIN pin, unsigned char val)
         pinset(DS, val & (1 << i));
         togglecp(pin);
     }
+
+    // SR3 is not a CD74AC164E (I only had 2 when assembling the prototype), but a SN74HC595N.
+    // This SR has an extra RCLK step which "commits" registers set with SRCLK to outputs. Because
+    // I don't have many pins handy, I simply soldered SRCLK to RCLK, but that means that outputs
+    // are always one step late. For this SR, we need an extra SRCLK/RCLK toggle to have proper
+    // outputs.
+    if (pin == SR3_CP) {
+        togglecp(pin);
+    }
+}
+
+static void senddigits(unsigned int val)
+{
+    unsigned char digits[10] = {Seg7_0, Seg7_1, Seg7_2, Seg7_3, Seg7_4, Seg7_5, Seg7_6, Seg7_7, Seg7_8, Seg7_9};
+
+    // We use bitwise NOT because our 7seg is a Common Anode, which means that *low* pins are
+    // enabled.
+    shiftsend(SR1_CP, ~digits[val % 10]);
+    val /= 10;
+    shiftsend(SR2_CP, ~digits[val % 10]);
+    val /= 10;
+
+    // We indicate overflow by enabling the dot on the 3rd digit
+    if (val >= 10) {
+        shiftsend(SR3_CP, ~(digits[val % 10] | Seg7_Dot));
+    } else {
+        shiftsend(SR3_CP, ~digits[val % 10]);
+    }
 }
 
 int main (void)
 {
-    unsigned char digits[10] = {Seg7_0, Seg7_1, Seg7_2, Seg7_3, Seg7_4, Seg7_5, Seg7_6, Seg7_7, Seg7_8, Seg7_9};
-    unsigned char i;
+    unsigned int i;
 
     pinoutputmode(CP1);
     pinoutputmode(CP2);
@@ -100,12 +141,9 @@ int main (void)
     pinhigh(CP1);
     pinhigh(CP2);
 
-    for (i=0; i<10; i++)
+    for (i=0; i<1024; i++)
     {
-        // We use bitwise NOT because our 7seg is a Common Anode, which means that *low* pins are
-        // enabled.
-        shiftsend(SR1_CP, ~digits[i]);
-        shiftsend(SR2_CP, ~digits[i]);
-        _delay_ms(1000);
+        senddigits(i);
+        _delay_ms(200);
     }
 }
