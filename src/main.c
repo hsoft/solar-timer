@@ -1,7 +1,9 @@
 #include <avr/io.h>
 #include <util/delay.h>
+#include <avr/interrupt.h>
 #include "../common/pin.h"
 #include "../common/util.h"
+#include "../common/timer.h"
 
 /* 3 7-segments displays managed with shift registers
  *
@@ -74,6 +76,8 @@ typedef enum {
     SR2_CP,
     SR3_CP
 } SR_CP_PIN;
+
+static volatile bool refresh_needed = true;
 
 /* our decoder keep output pins high except for the selected one. To toggle our selected CP, our
  * strategy is to generally keep all CP pins high by selecting output Y3 of the decoder. Then, we
@@ -149,8 +153,15 @@ static unsigned int adc0val()
     return (high << 8) | low;
 }
 
+ISR(TIMER0_COMPA_vect)
+{
+    refresh_needed = true;
+}
+
 static void setup()
 {
+    sei();
+
     pinoutputmode(CP1);
     pinoutputmode(CP2);
     pinoutputmode(DS);
@@ -159,9 +170,18 @@ static void setup()
     pinhigh(CP1);
     pinhigh(CP2);
 
+    // Set ADC
     ADMUX = (1 << MUX0); // ADC1
     ADCSRA |= (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
     sbi(ADCSRA, ADEN);
+
+    // Set timer that controls refreshes
+    set_timer1_target(F_CPU); // every 1 second
+    // Enable CTC mode
+    sbi(TCCR1, CTC1);
+    // Enable interrupt on compare match on OCR1A.
+    sbi(TIMSK, OCIE1A);
+    TCNT1 = 0;
 }
 
 int main(void)
@@ -169,7 +189,9 @@ int main(void)
     setup();
 
     while (1) {
-        senddigits(adc0val());
-        _delay_ms(1000);
+        if (refresh_needed) {
+            refresh_needed = false;
+            senddigits(adc0val());
+        }
     }
 }
