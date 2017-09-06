@@ -6,7 +6,7 @@ F_CPU ?= 1000000UL
 AVRDUDEMCU ?= t45
 AVRDUDEARGS ?= -c usbtiny -P usb 
 
-OBJS = $(addprefix src/, main.o)
+OBJS = $(addprefix src/, main.o solartimer.o)
 OBJS += $(addprefix common/, pin.o timer.o adc.o)
 PROGNAME = solartimer
 
