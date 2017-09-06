@@ -2,8 +2,8 @@
 #include <util/delay.h>
 #include <avr/interrupt.h>
 #include "../common/pin.h"
-#include "../common/util.h"
 #include "../common/timer.h"
+#include "../common/adc.h"
 
 /* 3 7-segments displays managed with shift registers
  *
@@ -142,17 +142,6 @@ static void senddigits(unsigned int val)
     }
 }
 
-static unsigned int adc0val()
-{
-    unsigned char high, low;
-
-    sbi(ADCSRA, ADSC);
-    while (bit_is_set(ADCSRA, ADSC));
-    low = ADCL;
-    high = ADCH;
-    return (high << 8) | low;
-}
-
 ISR(TIMER0_COMPA_vect)
 {
     refresh_needed = true;
@@ -171,17 +160,12 @@ static void setup()
     pinhigh(CP2);
 
     // Set ADC
-    ADMUX = (1 << MUX0); // ADC1
-    ADCSRA |= (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
-    sbi(ADCSRA, ADEN);
+    adc_select(ADC_PIN1); // ADC1
+    adc_enable();
 
     // Set timer that controls refreshes
     set_timer1_target(F_CPU); // every 1 second
-    // Enable CTC mode
-    sbi(TCCR1, CTC1);
-    // Enable interrupt on compare match on OCR1A.
-    sbi(TIMSK, OCIE1A);
-    TCNT1 = 0;
+    set_timer1_mode(TIMER_MODE_INTERRUPT);
 }
 
 int main(void)
@@ -191,7 +175,7 @@ int main(void)
     while (1) {
         if (refresh_needed) {
             refresh_needed = false;
-            senddigits(adc0val());
+            senddigits(adc_val());
         }
     }
 }

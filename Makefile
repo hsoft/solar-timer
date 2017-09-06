@@ -7,7 +7,7 @@ AVRDUDEMCU ?= t45
 AVRDUDEARGS ?= -c usbtiny -P usb 
 
 OBJS = $(addprefix src/, main.o)
-OBJS += $(addprefix common/, pin.o timer.o)
+OBJS += $(addprefix common/, pin.o timer.o adc.o)
 PROGNAME = solartimer
 
 CC = avr-gcc
