@@ -3,8 +3,12 @@ OBJS += $(addprefix ../src/, solartimer.o)
 OBJS += $(addprefix ../common/, sim_pin.o sim_timer.o sim_adc.o)
 PROGNAME = solartimer
 
+INCS = `pkg-config --cflags python-3.4`
+LIBS = `pkg-config --libs python-3.4`
+
 EXTRACFLAGS ?= 
-CFLAGS = -DSIMULATION -Wall $(EXTRACFLAGS) -c
+CFLAGS = $(INCS) -DSIMULATION -Wall $(EXTRACFLAGS) -c
+LDFLAGS = $(LIBS)
 
 # Patterns
 
