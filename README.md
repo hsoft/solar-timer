@@ -33,5 +33,7 @@ This project can be simulated on a desktop comupter! The simulation uses [icemu]
 requires Python 3.4+ with development header (`python3-dev` on Ubuntu). Once you have that,
 `cd` into `sim` and run `make`, then `./solartimer`. You'll get something like this:
 
+[![asciinema](https://asciinema.org/a/8XM8TD9x1ZavzscsB2NUDYqeb.png)](https://asciinema.org/a/8XM8TD9x1ZavzscsB2NUDYqeb)
+
 [radius-of-earth]: http://www.solipsys.co.uk/new/TheRadiusOfTheEarth.html
 [icemu]: https://github.com/hsoft/icemu
