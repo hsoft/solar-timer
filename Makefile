@@ -15,6 +15,8 @@ EXTRACFLAGS ?=
 CFLAGS = -O3 -Wall $(EXTRACFLAGS) -DF_CPU=$(F_CPU) -mmcu=$(MCU) -c
 LDFLAGS = -mmcu=$(MCU)
 
+SUBMODULE_TARGETS = common/README.md
+
 # Patterns
 
 %.o: %.c
@@ -24,7 +26,7 @@ LDFLAGS = -mmcu=$(MCU)
 
 .PHONY: send clean
 
-all: $(PROGNAME).hex
+all: $(SUBMODULE_TARGETS) $(PROGNAME).hex
 	@echo Done!
 
 send: $(PROGNAME).hex
@@ -32,6 +34,10 @@ send: $(PROGNAME).hex
 
 clean:
 	rm -f $(OBJS) $(PROGNAME).hex $(PROGNAME).bin
+
+$(SUBMODULE_TARGETS):
+	git submodule init
+	git submodule update
 
 $(PROGNAME).bin: $(OBJS)
 	$(CC) $(LDFLAGS) $+ -o $@

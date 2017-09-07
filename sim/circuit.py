@@ -1,6 +1,3 @@
-import sys
-sys.path.insert(0, "/home/vdupras/src/icemu")
-
 import random
 
 from icemu.chip import Chip

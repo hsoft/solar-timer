@@ -3,15 +3,18 @@ OBJS += $(addprefix ../src/, solartimer.o)
 OBJS += $(addprefix ../common/, sim.o sim_pin.o sim_timer.o sim_adc.o)
 PROGNAME = solartimer
 
-INCS = `pkg-config --cflags python-3.4`
-LIBS = `pkg-config --libs python-3.4`
+PYTHON ?= python3
+PYTHONVERSION := $(shell $(PYTHON) -c "import sysconfig; print(sysconfig.get_python_version(), end='')")
+INCS := $(shell pkg-config --cflags python-$(PYTHONVERSION))
+LIBS := $(shell pkg-config --libs python-$(PYTHONVERSION))
 
 EXTRACFLAGS ?= 
 CFLAGS = $(INCS) -DSIMULATION -Wall $(EXTRACFLAGS) -c
 LDFLAGS = $(LIBS)
 
-# Patterns
+SUBMODULE_TARGETS = ../common/README.md
 
+# Patterns
 %.o: %.c
 	$(CC) $(CFLAGS) -o $@ $<
 
@@ -19,11 +22,16 @@ LDFLAGS = $(LIBS)
 
 .PHONY: clean
 
-all: $(PROGNAME)
+all: $(SUBMODULE_TARGETS) $(PROGNAME)
 	@echo Done!
 
 clean:
+	echo $(PYTHONVERSION)
 	rm -f $(OBJS) $(PROGNAME)
+
+$(SUBMODULE_TARGETS):
+	git submodule init
+	git submodule update
 
 $(PROGNAME): $(OBJS)
 	$(CC) $(LDFLAGS) $+ -o $@

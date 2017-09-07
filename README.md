@@ -1,7 +1,7 @@
 # Solar Timer
 
 The goal of this device is to measure the time it takes for Earth to rotate so that the light
-received at elevation `X` reaches the same position, but at elevation `X - L`, `L being the length
+received at elevation `X` reaches the same position, but at elevation `X - L`, `L` being the length
 of a wall or something. The experience is similar to the one proposed
 [in this page][radius-of-earth].
 
@@ -20,4 +20,18 @@ I only have the first draft of a schematic for now. I haven't even tried it in a
 still waiting for parts. Source code and assembly instructions will come after the first prototype
 has been built.
 
+## Building
+
+You can build the program with `make`, after having first made sure that the `common` subrepo was
+up to date with `git submodule init; git submodule update`.
+
+Then, you can send it to the chip with an AVR programmer with `make send`.
+
+## Simulation
+
+This project can be simulated on a desktop comupter! The simulation uses [icemu][icemu] and
+requires Python 3.4+ with development header (`python3-dev` on Ubuntu). Once you have that,
+`cd` into `sim` and run `make`, then `./solartimer`. You'll get something like this:
+
 [radius-of-earth]: http://www.solipsys.co.uk/new/TheRadiusOfTheEarth.html
+[icemu]: https://github.com/hsoft/icemu
