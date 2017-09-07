@@ -102,9 +102,7 @@ static void togglecp(SR_CP_PIN pin)
             pinlow(CP1);
             break;
     }
-#ifndef SIMULATION
     _delay_us(100);
-#endif
     // select y3 (all high)
     pinhigh(CP1);
     pinhigh(CP2);

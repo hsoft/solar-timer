@@ -1,6 +1,6 @@
 OBJS = main.o
 OBJS += $(addprefix ../src/, solartimer.o)
-OBJS += $(addprefix ../common/, sim_pin.o sim_timer.o sim_adc.o)
+OBJS += $(addprefix ../common/, sim.o sim_pin.o sim_timer.o sim_adc.o)
 PROGNAME = solartimer
 
 INCS = `pkg-config --cflags python-3.4`

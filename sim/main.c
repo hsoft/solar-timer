@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <Python.h>
 #include "../src/solartimer.h"
+#include "../common/sim.h"
 
 static volatile sig_atomic_t should_stop = 0;
 
@@ -33,6 +34,7 @@ int main(void)
     while (!should_stop) {
         solartimer_loop();
         printf("Sleep...\n");
+        _delay_ms(1000);
         sleep(1);
     }
 
