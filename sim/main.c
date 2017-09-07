@@ -32,8 +32,10 @@ int main(void)
 
     printf("Loop\n");
     while (!should_stop) {
+        if (timer1_interrupt_check()) {
+            solartimer_timer1_interrupt();
+        }
         solartimer_loop();
-        printf("Sleep...\n");
         _delay_ms(1000);
         sleep(1);
     }

@@ -150,7 +150,7 @@ static void senddigits(unsigned int val)
 #ifndef SIMULATION
 ISR(TIMER0_COMPA_vect)
 #else
-void interrupt_timer0()
+void solartimer_timer1_interrupt()
 #endif
 {
     refresh_needed = true;
