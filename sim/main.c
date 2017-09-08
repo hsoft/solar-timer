@@ -19,7 +19,7 @@ int main(void)
 
     signal(SIGINT, handle_signal);
 
-    printf("Initializing circuit\n");
+    printf("Initializing...\n");
     Py_Initialize();
     gilState = PyGILState_Ensure();
     fp = fopen("circuit.py", "r");
@@ -27,18 +27,16 @@ int main(void)
     fclose(fp);
     PyGILState_Release(gilState);
 
-    printf("Setup\n");
     solartimer_setup();
 
-    printf("Loop\n");
     while (!should_stop) {
         if (timer1_interrupt_check()) {
             solartimer_timer1_interrupt();
         }
         solartimer_loop();
-        _delay_ms(1000);
-        sleep(1);
+        _delay_ms(100);
     }
 
+    sim_stop();
     Py_Finalize();
 }
