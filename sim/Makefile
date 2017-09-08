@@ -26,7 +26,6 @@ all: $(SUBMODULE_TARGETS) $(PROGNAME)
 	@echo Done!
 
 clean:
-	echo $(PYTHONVERSION)
 	rm -f $(OBJS) $(PROGNAME)
 
 $(SUBMODULE_TARGETS):

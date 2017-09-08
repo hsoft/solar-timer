@@ -43,6 +43,7 @@ class Circuit:
         self.timer1_target = -1
         self.timer1_triggered = False
         self.luminosity_reading = 100
+        self.button_pressed_at = None
 
         self.dec.wirepins(self.mcu, ['A', 'B'], ['B1', 'B0'])
 
@@ -81,6 +82,9 @@ class Circuit:
         if self.timer1 >= self.timer1_target:
             self.timer1 -= self.timer1_target
             self.timer1_triggered = True
+        if self.button_pressed_at and time.time() - self.button_pressed_at > 0.5:
+            self.button_pressed_at = None
+            self.mcu.pin_B3.setlow()
         while circuit and time.time() < end:
             if uiscreen:
                 uiscreen.refresh()
@@ -95,6 +99,10 @@ class Circuit:
         newval = self.luminosity_reading + amount
         newval = max(0, min(newval, 1023))
         self.luminosity_reading = newval
+
+    def press_button(self):
+        self.mcu.pin_B3.sethigh()
+        self.button_pressed_at = time.time()
 
 circuit = None
 uiscreen = None
@@ -122,6 +130,9 @@ def set_timer1_target(ticks):
 def set_timer1_mode(mode):
     pass
 
+def get_timer1_ticks():
+    return circuit.timer1
+
 def timer1_interrupt_check():
     return circuit.timer1_check()
 
@@ -139,6 +150,10 @@ def main():
         "LED Matrix output:",
         partial(combine_repr, circuit.seg3, circuit.seg2, circuit.seg1)
     )
+    uiscreen.add_element(
+        "Raw ADC val:",
+        lambda: str(adcval())
+    )
     uiscreen.add_action(
         'q', "Quit",
         partial(os.kill, os.getpid(), signal.SIGINT),
@@ -150,6 +165,10 @@ def main():
     uiscreen.add_action(
         '-', "Less light",
         partial(circuit.increase_light, -20),
+    )
+    uiscreen.add_action(
+        'b', "Press button for 500ms",
+        circuit.press_button
     )
     uiscreen.refresh()
 

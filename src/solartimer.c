@@ -60,6 +60,7 @@
 #define CP1 PinB1
 #define CP2 PinB0
 #define DS PinB4
+#define ACTION_BUTTON PinB3
 
 // Least significant bit is on Q0
 //               XABCDEGF
@@ -76,13 +77,33 @@
 #define Seg7_Dash 0b00000010
 #define Seg7_Dot 0b10000000
 
+// When timer is inactive, we simple show ADC readings.
+#define TIMER_INACTIVE -1
+// When timer is finished, we show elapsed time.
+#define TIMER_FINISHED -2
+
+// The delta in value we need before we consider that we're in "low light" condition
+#define DROP_THRESHOLD 50
+
 typedef enum {
     SR1_CP,
     SR2_CP,
     SR3_CP
 } SR_CP_PIN;
 
-static volatile bool refresh_needed = true;
+static volatile bool refresh_needed;
+
+// negative value == TIMER_* const
+static volatile int timer_value_target;
+
+static volatile unsigned int timer_elapsed_secs;
+static unsigned int timer_elapsed_msecs;
+
+// Set to true when our adcval drops by DROP_THRESHOLD compared to timer_value_target.
+// Once this is set, reading a value that exceed timer_value_target wil stop our timer.
+static bool drop_condition_reached;
+
+static bool action_button_is_pressed;
 
 /* our decoder keep output pins high except for the selected one. To toggle our selected CP, our
  * strategy is to generally keep all CP pins high by selecting output Y3 of the decoder. Then, we
@@ -147,6 +168,67 @@ static void senddigits(unsigned int val)
     }
 }
 
+static void senddashes()
+{
+    shiftsend(SR1_CP, ~Seg7_Dash);
+    shiftsend(SR2_CP, ~Seg7_Dash);
+    shiftsend(SR3_CP, ~Seg7_Dash);
+}
+
+// Returns trus if the action button was *just* pressed.
+static bool check_action_button_status()
+{
+    if (pinishigh(ACTION_BUTTON)) {
+        if (!action_button_is_pressed) {
+            action_button_is_pressed = true;
+            return true;
+        }
+    } else {
+        action_button_is_pressed = false;
+    }
+    return false;
+}
+
+static void start_timer()
+{
+    timer_elapsed_secs = 0;
+    // We record TCNT1 when we start the timer, and we'll compare it with the value
+    // at timer stop to compute a final msecs value.
+    /*timer_elapsed_msecs = (unsigned int)ticks_to_msecs(get_timer1_rescaled_tcnt());*/
+    /*timer_value_target = (int)adcval();*/
+    timer_value_target = 42;
+    drop_condition_reached = false;
+}
+
+static void stop_timer()
+{
+    unsigned int msecs;
+
+    timer_value_target = TIMER_FINISHED;
+    msecs = (unsigned int)ticks_to_msecs(get_timer1_rescaled_tcnt());
+    if (msecs < timer_elapsed_msecs) {
+        timer_elapsed_secs ++;
+        msecs += 1000;
+    }
+    timer_elapsed_msecs = msecs - timer_elapsed_msecs;
+}
+
+static void update_timer()
+{
+    unsigned int val;
+
+    val = adc_val();
+    if (drop_condition_reached) {
+        if (val >= timer_value_target) {
+            stop_timer();
+        }
+    } else {
+        if (val + DROP_THRESHOLD < timer_value_target) {
+            drop_condition_reached = true;
+        }
+    }
+}
+
 #ifndef SIMULATION
 ISR(TIMER0_COMPA_vect)
 #else
@@ -154,6 +236,9 @@ void solartimer_timer1_interrupt()
 #endif
 {
     refresh_needed = true;
+    if (timer_value_target >= 0) {
+        timer_elapsed_secs++;
+    }
 }
 
 void solartimer_setup()
@@ -177,13 +262,41 @@ void solartimer_setup()
     // Set timer that controls refreshes
     set_timer1_target(F_CPU); // every 1 second
     set_timer1_mode(TIMER_MODE_INTERRUPT);
+
+    // initial values
+    refresh_needed = true;
+    timer_value_target = TIMER_INACTIVE;
+    action_button_is_pressed = false;
 }
 
 void solartimer_loop()
 {
-    if (refresh_needed) {
-        refresh_needed = false;
-        senddigits(adc_val());
+    if (timer_value_target == TIMER_INACTIVE) {
+        if (refresh_needed) {
+            refresh_needed = false;
+            senddigits(adc_val());
+        }
+        if (check_action_button_status()) {
+            start_timer();
+            timer_value_target = adc_val();
+        }
+    } else if (timer_value_target == TIMER_FINISHED) {
+        if (refresh_needed) {
+            refresh_needed = false;
+            senddigits(timer_elapsed_secs);
+        }
+        if (check_action_button_status()) {
+            timer_value_target = TIMER_INACTIVE;
+        }
+    } else {
+        update_timer();
+        if (refresh_needed) {
+            refresh_needed = false;
+            if (drop_condition_reached) {
+                senddigits(timer_elapsed_secs);
+            } else {
+                senddashes();
+            }
+        }
     }
 }
-
