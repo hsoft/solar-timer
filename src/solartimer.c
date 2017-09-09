@@ -194,9 +194,8 @@ static void start_timer()
     timer_elapsed_secs = 0;
     // We record TCNT1 when we start the timer, and we'll compare it with the value
     // at timer stop to compute a final msecs value.
-    /*timer_elapsed_msecs = (unsigned int)ticks_to_msecs(get_timer1_rescaled_tcnt());*/
-    /*timer_value_target = (int)adcval();*/
-    timer_value_target = 42;
+    timer_elapsed_msecs = (unsigned int)ticks_to_msecs(get_timer1_rescaled_tcnt());
+    timer_value_target = (int)adc_val();
     drop_condition_reached = false;
 }
 
@@ -230,7 +229,7 @@ static void update_timer()
 }
 
 #ifndef SIMULATION
-ISR(TIMER0_COMPA_vect)
+ISR(TIMER1_COMPA_vect)
 #else
 void solartimer_timer1_interrupt()
 #endif
@@ -278,7 +277,6 @@ void solartimer_loop()
         }
         if (check_action_button_status()) {
             start_timer();
-            timer_value_target = adc_val();
         }
     } else if (timer_value_target == TIMER_FINISHED) {
         if (refresh_needed) {
