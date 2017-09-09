@@ -1,3 +1,4 @@
+#include <stdint.h>
 #ifndef SIMULATION
 #include <avr/io.h>
 #include <util/delay.h>
@@ -94,10 +95,10 @@ typedef enum {
 static volatile bool refresh_needed;
 
 // negative value == TIMER_* const
-static volatile int timer_value_target;
+static int timer_value_target;
 
 static volatile unsigned int timer_elapsed_secs;
-static unsigned int timer_elapsed_msecs;
+static volatile unsigned int timer_elapsed_msecs;
 
 // Set to true when our adcval drops by DROP_THRESHOLD compared to timer_value_target.
 // Once this is set, reading a value that exceed timer_value_target wil stop our timer.
@@ -130,7 +131,7 @@ static void togglecp(SR_CP_PIN pin)
 }
 
 // LSB goes on q0
-static void shiftsend(SR_CP_PIN pin, unsigned char val)
+static void shiftsend(SR_CP_PIN pin, uint8_t val)
 {
     char i;
 
@@ -149,23 +150,27 @@ static void shiftsend(SR_CP_PIN pin, unsigned char val)
     }
 }
 
-static void senddigits(unsigned int val)
+static void senddigits(uint16_t val, uint8_t dotmask)
 {
-    unsigned char digits[10] = {Seg7_0, Seg7_1, Seg7_2, Seg7_3, Seg7_4, Seg7_5, Seg7_6, Seg7_7, Seg7_8, Seg7_9};
+    uint8_t digits[10] = {Seg7_0, Seg7_1, Seg7_2, Seg7_3, Seg7_4, Seg7_5, Seg7_6, Seg7_7, Seg7_8, Seg7_9};
+    uint8_t tosend[3];
+    uint8_t i;
 
+    if (val > 999) {
+        dotmask |= 0b100;
+    }
+    for (i=0; i<=2; i++) {
+        tosend[i] = digits[val % 10];
+        if (dotmask & (1 << i)) {
+            tosend[i] |= Seg7_Dot;
+        }
+        val /= 10;
+    }
     // We use bitwise NOT because our 7seg is a Common Anode, which means that *low* pins are
     // enabled.
-    shiftsend(SR1_CP, ~digits[val % 10]);
-    val /= 10;
-    shiftsend(SR2_CP, ~digits[val % 10]);
-    val /= 10;
-
-    // We indicate overflow by enabling the dot on the 3rd digit
-    if (val >= 10) {
-        shiftsend(SR3_CP, ~(digits[val % 10] | Seg7_Dot));
-    } else {
-        shiftsend(SR3_CP, ~digits[val % 10]);
-    }
+    shiftsend(SR1_CP, ~tosend[0]);
+    shiftsend(SR2_CP, ~tosend[1]);
+    shiftsend(SR3_CP, ~tosend[2]);
 }
 
 static void senddashes()
@@ -173,6 +178,24 @@ static void senddashes()
     shiftsend(SR1_CP, ~Seg7_Dash);
     shiftsend(SR2_CP, ~Seg7_Dash);
     shiftsend(SR3_CP, ~Seg7_Dash);
+}
+
+static void sendelapsed()
+{
+    uint8_t dotmask;
+    uint16_t val;
+
+    if (timer_elapsed_secs > 99) {
+        val = timer_elapsed_secs;
+        dotmask = 0;
+    } else if (timer_elapsed_secs > 9) {
+        val = timer_elapsed_secs * 10 + (timer_elapsed_msecs / 100);
+        dotmask = 0b10;
+    } else {
+        val = timer_elapsed_secs * 100 + (timer_elapsed_msecs / 10);
+        dotmask = 0b100;
+    }
+    senddigits(val, dotmask);
 }
 
 // Returns trus if the action button was *just* pressed.
@@ -192,24 +215,17 @@ static bool check_action_button_status()
 static void start_timer()
 {
     timer_elapsed_secs = 0;
-    // We record TCNT1 when we start the timer, and we'll compare it with the value
-    // at timer stop to compute a final msecs value.
-    timer_elapsed_msecs = (unsigned int)ticks_to_msecs(get_timer1_rescaled_tcnt());
+    timer_elapsed_msecs = 0;
+    set_timer0_target(F_CPU/100); // every 10ms
+    set_timer0_mode(TIMER_MODE_INTERRUPT);
     timer_value_target = (int)adc_val();
     drop_condition_reached = false;
 }
 
 static void stop_timer()
 {
-    unsigned int msecs;
-
+    set_timer0_target(0);
     timer_value_target = TIMER_FINISHED;
-    msecs = (unsigned int)ticks_to_msecs(get_timer1_rescaled_tcnt());
-    if (msecs < timer_elapsed_msecs) {
-        timer_elapsed_secs ++;
-        msecs += 1000;
-    }
-    timer_elapsed_msecs = msecs - timer_elapsed_msecs;
 }
 
 static void update_timer()
@@ -229,15 +245,25 @@ static void update_timer()
 }
 
 #ifndef SIMULATION
+ISR(TIMER0_COMPA_vect)
+#else
+void solartimer_timer0_interrupt()
+#endif
+{
+    timer_elapsed_msecs += 10;
+    if (timer_elapsed_msecs >= 1000) {
+        timer_elapsed_msecs -= 1000;
+        timer_elapsed_secs++;
+    }
+}
+
+#ifndef SIMULATION
 ISR(TIMER1_COMPA_vect)
 #else
 void solartimer_timer1_interrupt()
 #endif
 {
     refresh_needed = true;
-    if (timer_value_target >= 0) {
-        timer_elapsed_secs++;
-    }
 }
 
 void solartimer_setup()
@@ -273,7 +299,7 @@ void solartimer_loop()
     if (timer_value_target == TIMER_INACTIVE) {
         if (refresh_needed) {
             refresh_needed = false;
-            senddigits(adc_val());
+            senddigits(adc_val(), 0);
         }
         if (check_action_button_status()) {
             start_timer();
@@ -281,7 +307,7 @@ void solartimer_loop()
     } else if (timer_value_target == TIMER_FINISHED) {
         if (refresh_needed) {
             refresh_needed = false;
-            senddigits(timer_elapsed_secs);
+            sendelapsed();
         }
         if (check_action_button_status()) {
             timer_value_target = TIMER_INACTIVE;
@@ -291,7 +317,7 @@ void solartimer_loop()
         if (refresh_needed) {
             refresh_needed = false;
             if (drop_condition_reached) {
-                senddigits(timer_elapsed_secs);
+                senddigits(timer_elapsed_secs, 0);
             } else {
                 senddashes();
             }

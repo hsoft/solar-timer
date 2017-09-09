@@ -29,6 +29,29 @@ class ATtiny45(Chip):
         return self.getpin(code)
 
 
+class Timer:
+    def __init__(self):
+        self.cnt = 0
+        self.target = 0
+
+    def delay(self, us):
+        if self.target > 0:
+            self.cnt += us
+
+    def check(self):
+        if self.target <= 0:
+            return False
+        if self.cnt >= self.target:
+            self.cnt -= self.target
+            return True
+        else:
+            return False
+
+    def set_target(self, target):
+        self.target = target
+        self.cnt = 0
+
+
 class Circuit:
     def __init__(self):
         self.mcu = ATtiny45()
@@ -39,7 +62,8 @@ class Circuit:
         self.seg1 = Segment7()
         self.seg2 = Segment7()
         self.seg3 = Segment7()
-        self.timer1 = 0
+        self.timer0 = Timer()
+        self.timer1 = Timer()
         self.timer1_target = -1
         self.timer1_triggered = False
         self.luminosity_reading = 100
@@ -77,23 +101,14 @@ class Circuit:
     def delay(self, us):
         begin = time.time()
         end = begin + us / (1000 * 1000)
-        if self.timer1_target:
-            self.timer1 += us
-        if self.timer1 >= self.timer1_target:
-            self.timer1 -= self.timer1_target
-            self.timer1_triggered = True
+        self.timer0.delay(us)
+        self.timer1.delay(us)
         if self.button_pressed_at and time.time() - self.button_pressed_at > 0.5:
             self.button_pressed_at = None
             self.mcu.pin_B3.setlow()
         while circuit and time.time() < end:
             if uiscreen:
                 uiscreen.refresh()
-
-    def timer1_check(self):
-        if self.timer1_triggered:
-            self.timer1_triggered = False
-            return True
-        return False
 
     def increase_light(self, amount):
         newval = self.luminosity_reading + amount
@@ -124,17 +139,23 @@ def adcval():
     val = circuit.luminosity_reading + random.randint(-10, 10) # so that all digits get some change
     return max(0, min(val, 1023))
 
+def set_timer0_target(ticks):
+    circuit.timer0.set_target(ticks)
+
+def set_timer0_mode(mode):
+    pass
+
+def timer0_interrupt_check():
+    return circuit.timer0.check()
+
 def set_timer1_target(ticks):
-    circuit.timer1_target = ticks
+    circuit.timer1.set_target(ticks)
 
 def set_timer1_mode(mode):
     pass
 
-def get_timer1_ticks():
-    return circuit.timer1
-
 def timer1_interrupt_check():
-    return circuit.timer1_check()
+    return circuit.timer1.check()
 
 def stop():
     global circuit, uiscreen

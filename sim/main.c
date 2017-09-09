@@ -30,11 +30,14 @@ int main(void)
     solartimer_setup();
 
     while (!should_stop) {
+        if (timer0_interrupt_check()) {
+            solartimer_timer0_interrupt();
+        }
         if (timer1_interrupt_check()) {
             solartimer_timer1_interrupt();
         }
         solartimer_loop();
-        _delay_ms(100);
+        _delay_ms(5);
     }
 
     sim_stop();
