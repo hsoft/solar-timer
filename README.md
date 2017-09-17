@@ -20,6 +20,21 @@ I only have the first draft of a schematic for now. I haven't even tried it in a
 still waiting for parts. Source code and assembly instructions will come after the first prototype
 has been built.
 
+### Status update: what was I thinking?
+
+Given the scale of the result I'm trying to get, there's no way I can possibly lower my device fast
+enough to follow the sun! I already have a prototype which was fun to build, but is kinda useless.
+
+A better way to proceed would be to have a device that has **two** phototransistor a couple of
+meters apart and pre-placed on the wall. Then, the device will have to measure the difference
+between inputs at as sub-millisecond precision.
+
+For me to build this, I first need to benchtest the precision of ATtiny54's oscillator, and from
+what I read on the internet, it will probably not be precise enough. I will then have to benchmark
+the precision of different external oscillator setup.
+
+That's a whole new project, and until I'm done there, this project is stalled.
+
 ## Building
 
 You can build the program with `make`, after having first made sure that the `common` subrepo was
